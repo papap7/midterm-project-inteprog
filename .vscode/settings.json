@@ -6,6 +6,13 @@
     "system_error": "cpp",
     "xlocale": "cpp",
     "istream": "cpp",
-    "string": "cpp"
+    "string": "cpp",
+    "initializer_list": "cpp",
+    "list": "cpp",
+    "regex": "cpp",
+    "type_traits": "cpp",
+    "vector": "cpp",
+    "xhash": "cpp",
+    "xutility": "cpp"
   }
 }
