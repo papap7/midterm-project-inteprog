@@ -2,33 +2,13 @@
 #include <iostream>
 #include <string>
 #include <iomanip>
+#include <limits>
 
 using namespace std;
 
 bool isValidChoice(const string &input)
 {
     return input.length() == 1 && input[0] >= '1' && input[0] <= '7';
-}
-
-bool isValidCategory(const string &input)
-{
-    return input == "Fiction" || input == "fiction" || input == "FICTION" || input == "Non-Fiction" || input == "non-fiction" || input == "NON-FICTION";
-}
-
-bool isValidId(const string &input)
-{
-    if (input.length() != 3)
-    {
-        return false;
-    }
-    for (char c : input)
-    {
-        if (!isalnum(c))
-        {
-            return false;
-        }
-    }
-    return true;
 }
 
 bool isValidIsbn(const string &input)
@@ -39,7 +19,7 @@ bool isValidIsbn(const string &input)
     }
     for (char c : input)
     {
-        if ((!isdigit(c) && c != '-') || isspace(c))
+        if (!isdigit(c) && c != '-')
         {
             return false;
         }
@@ -132,27 +112,14 @@ bool isValidPublication(const string &input)
     return true;
 }
 
-bool isValidInteger(const string &input)
-{
-    if (input.empty())
-        return false;
-    for (char c : input)
-    {
-        if (!isdigit(c) && isspace(c))
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
 bool choiceConfirmation()
 {
     for (;;)
     {
         char confirmChoice;
         cin >> confirmChoice;
-        cin.ignore();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+
         confirmChoice = tolower(confirmChoice);
 
         if (confirmChoice == 'y')
@@ -165,9 +132,22 @@ bool choiceConfirmation()
         }
         else
         {
-            cout << "Invalid input. Please enter [Y] Yes or [N] No.\n";
+            cout << "Invalid input. Please enter [Y] Yes or [N] No: ";
+            cin.clear();
+            cin.ignore(numeric_limits<streamsize>::max(), '\n');
         }
     }
+}
+
+string toUpper(const string &input)
+{
+    string result = input;
+    for (char &c : result)
+    {
+        if (isalpha(c))
+            c = toupper(c);
+    }
+    return result;
 }
 
 class LibrarySystem
@@ -179,7 +159,7 @@ public:
     virtual void deleteBook() = 0;
     virtual void viewBookByCategory() = 0;
     virtual void viewAllBooks() = 0;
-    virtual ~LibrarySystem() {}
+    virtual ~LibrarySystem() {};
 };
 
 class Book
@@ -260,6 +240,137 @@ public:
     }
 };
 
+bool isValidIdFormat(const string &id)
+{
+    if (id.length() != 3)
+        return false;
+    for (char c : id)
+    {
+        if (!isalnum(c))
+            return false;
+    }
+    return true;
+}
+
+bool idExists(const string &id, Book *books[], int size)
+{
+    for (int i = 0; i < size; i++)
+    {
+        if (books[i] != nullptr && books[i]->getId() == id)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+string getValidId(Book *books[], int size, bool mustExist)
+{
+    string tempId, id;
+
+    for (;;)
+    {
+        cout << "Enter Book ID [XXX]: ";
+        cin.clear();
+        getline(cin, tempId);
+        id = toUpper(tempId);
+
+        if (!isValidIdFormat(id))
+        {
+            cout << "Invalid ID. Please enter a valid 3-length alphanumeric ID [XXX].\n";
+            continue;
+        }
+
+        bool found = idExists(id, books, size);
+        if (mustExist && !found)
+        {
+            cout << "Book with ID " << id << " not found.\n";
+            cout << "Do you want to continue searching? [(Y) Yes | (N) No] ";
+            if (!choiceConfirmation())
+                return "";
+        }
+        else if (!mustExist && found)
+        {
+            cout << "ID already exists. Please enter a different ID.\n";
+        }
+        else
+        {
+            return id;
+        }
+    }
+}
+
+bool isValidCategory(const string &input)
+{
+    return input == "Fiction" || input == "fiction" || input == "FICTION" || input == "Non-Fiction" || input == "non-fiction" || input == "NON-FICTION";
+}
+
+string getValidCategoryInput(bool allowEmpty = false)
+{
+    string category;
+    for (;;)
+    {
+        cout << "Input Category [FICTION | NON-FICTION]: ";
+        cin.clear();
+        getline(cin, category);
+
+        if (allowEmpty && category.empty())
+        {
+            return "";
+        }
+
+        if (!isValidCategory(category))
+        {
+            cout << "Category not found! Please enter either FICTION or NON-FICTION.\n";
+            continue;
+        }
+
+        return toUpper(category);
+    }
+}
+
+void displayBookDetails(Book *book)
+{
+    cout << "\nDetails of the book ID [" << book->getId() << "]:\n"
+         << "ISBN: " << book->getIsbn() << "\n"
+         << "Title: " << book->getTitle() << "\n"
+         << "Author: " << book->getAuthor() << "\n"
+         << "Edition: " << book->getEdition() << "\n"
+         << "Publication Year: " << book->getPublication() << "\n"
+         << "Category: " << book->getCategory() << "\n";
+}
+
+bool checkBooksAvailability(Book *books[], int size)
+{
+    bool hasBooks = false;
+    for (int i = 0; i < size; i++)
+    {
+        if (books[i] != nullptr)
+        {
+            hasBooks = true;
+            break;
+        }
+    }
+
+    if (!hasBooks)
+    {
+        cout << "No books available.\nPress Enter to continue...";
+        cin.get();
+    }
+
+    return hasBooks;
+}
+
+bool isLibraryFull(Book *books[], int size)
+{
+    for (int i = 0; i < size; i++)
+    {
+        if (books[i] == nullptr)
+            return false;
+    }
+    return true;
+}
+
 class Library : public LibrarySystem
 {
 private:
@@ -278,274 +389,188 @@ public:
 
     void addBook() override
     {
-        cout << "\n- - - - - - - - - - Add Book - - - - - - - - - - \n";
-        cout << "Adding Book to Library...\n";
-        string id, isbn, title, author, edition, publication, category;
         for (;;)
         {
-            cout << "Input Category (FICTION | NON-FICTION): ";
-            getline(cin, category);
-            if (isValidCategory(category) == false)
+            cout << "\n- - - - - - - - - - Add Book - - - - - - - - - - \n";
+            if (isLibraryFull(books, size))
             {
-                cout << "Category not found! Please enter either FICTION or NON-FICTION.\n";
-                continue;
+                cout << "Library is full. Cannot add more books.\n";
+                cout << "Press Enter to continue...";
+                cin.get();
+                return;
             }
-            for (char &c : category)
-            {
-                if (isalpha(c))
-                    c = toupper(c);
-            }
-            cout << "Category is valid! Book category: " << category << "\n- - - - - - - Book Details - - - - - - -\n";
-            break;
-        }
+            cout << "Adding Book to Library...\n";
+            string tempId, id, isbn, title, author, edition, publication, category;
 
-        for (;;)
-        {
-            cout << "Input Book ID (XXX): ";
-            getline(cin, id);
+            category = getValidCategoryInput(false);
+            id = getValidId(books, size, false);
 
-            if (!isValidId(id))
-            {
-                cout << "Invalid ID. Please enter a valid 3-digit number or uppercase letters.\n";
-                continue;
-            }
+            cout << "ID is valid! Book ID: " << id << "\n";
 
-            for (char &c : id)
+            for (;;)
             {
-                if (isalpha(c))
+                cout << "Enter ISBN [10 | 13 characters only]: ";
+                getline(cin, isbn);
+
+                if (!isValidIsbn(isbn))
                 {
-                    c = toupper(c);
+                    cout << "Invalid ISBN. Please enter a valid ISBN.\n";
+                    continue;
                 }
-            }
 
-            bool exists = false;
-            for (int i = 0; i < size; i++)
-            {
-                if (books[i] != nullptr && books[i]->getId() == id)
+                bool exists = false;
+                for (int i = 0; i < size; i++)
                 {
-                    cout << "ID already exists. Please enter a different ID.\n";
-                    exists = true;
+                    if (books[i] != nullptr && books[i]->getIsbn() == isbn)
+                    {
+                        cout << "ISBN already exists. Please enter a different ISBN.\n";
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (!exists)
+                {
                     break;
                 }
             }
 
-            if (!exists)
+            cout << "ISBN is valid! Book ISBN: " << isbn << "\n";
+            for (;;)
             {
-                break;
-            }
-        }
-
-        cout << "ID is valid! Book ID: " << id << "\n";
-
-        for (;;)
-        {
-            cout << "Enter ISBN: ";
-            getline(cin, isbn);
-
-            if (!isValidIsbn(isbn))
-            {
-                cout << "Invalid ISBN. Please enter a valid ISBN.\n";
-                continue;
-            }
-
-            bool exists = false;
-            for (int i = 0; i < size; i++)
-            {
-                if (books[i] != nullptr && books[i]->getIsbn() == isbn)
+                cout << "Enter Title: ";
+                getline(cin, title);
+                if (isValidTitle(title) == false)
                 {
-                    cout << "ISBN already exists. Please enter a different ISBN.\n";
-                    exists = true;
-                    break;
+                    cout << "Invalid title. Please enter a valid title.\n";
+                    continue;
                 }
-            }
-
-            if (!exists)
-            {
                 break;
             }
-        }
 
-        cout << "ISBN is valid! Book ISBN: " << isbn << "\n";
-        for (;;)
-        {
-            cout << "Enter Title: ";
-            getline(cin, title);
-            if (isValidTitle(title) == false)
+            for (;;)
             {
-                cout << "Invalid title. Please enter a valid title.\n";
-                continue;
+                cout << "Enter Author: ";
+                getline(cin, author);
+                if (isValidAuthor(author) == false)
+                {
+                    cout << "Invalid author. Please enter a valid author.\n";
+                    continue;
+                }
+                break;
             }
-            break;
-        }
 
-        for (;;)
-        {
-            cout << "Enter Author: ";
-            getline(cin, author);
-            if (isValidAuthor(author) == false)
+            for (;;)
             {
-                cout << "Invalid author. Please enter a valid author.\n";
-                continue;
+                cout << "Enter Edition [1st | 1st Edition | First Edition]: ";
+                getline(cin, edition);
+                if (isValidEdition(edition) == false)
+                {
+                    cout << "Invalid edition. Please enter a valid edition.\n";
+                    continue;
+                }
+                break;
             }
-            break;
-        }
 
-        for (;;)
-        {
-            cout << "Enter Edition: ";
-            getline(cin, edition);
-            if (isValidEdition(edition) == false)
+            for (;;)
             {
-                cout << "Invalid edition. Please enter a valid edition.\n";
-                continue;
+                cout << "Enter Publication Year [1000 - 2025]: ";
+                getline(cin, publication);
+                if (isValidPublication(publication) == false)
+                {
+                    cout << "Invalid publication year. Please enter a valid publication year.\n";
+                    continue;
+                }
+                break;
             }
-            break;
-        }
 
-        for (;;)
-        {
-            cout << "Enter Publication Year: ";
-            getline(cin, publication);
-            if (isValidPublication(publication) == false)
-            {
-                cout << "Invalid publication year. Please enter a valid publication year.\n";
-                continue;
-            }
-            break;
-        }
+            cout << "\n- - - - - - - Book Details - - - - - - -\n";
+            cout << "ID: " << id << "\n"
+                 << "ISBN: " << isbn << "\n"
+                 << "Title: " << title << "\n"
+                 << "Author: " << author << "\n"
+                 << "Edition: " << edition << "\n"
+                 << "Publication Year: " << publication << "\n"
+                 << "Category: " << category << "\n";
+            cout << endl;
 
-        cout << "\n- - - - - - - Book Details - - - - - - -\n";
-        cout << "ID: " << id << "\n"
-             << "ISBN: " << isbn << "\n"
-             << "Title: " << title << "\n"
-             << "Author: " << author << "\n"
-             << "Edition: " << edition << "\n"
-             << "Publication Year: " << publication << "\n"
-             << "Category: " << category << "\n";
-        cout << endl;
-        for (;;)
-        {
             cout << "Confirm this book details? [(Y) Yes | (N) No] ";
             if (choiceConfirmation() == false)
             {
-                Library::addBook();
+                continue;
             }
-            break;
-        }
 
-        bool bookAdded = false;
-        for (int i = 0; i < size; i++)
-        {
-            if (books[i] == nullptr)
+            bool bookAdded = false;
+            for (int i = 0; i < size; i++)
             {
-                books[i] = new Book(id, isbn, title, author, edition, publication, category);
-                cout << "Book added successfully.\n";
-                bookAdded = true;
-                break;
+                if (books[i] == nullptr)
+                {
+                    books[i] = new Book(id, isbn, title, author, edition, publication, category);
+                    cout << "Book added successfully.\n";
+                    bookAdded = true;
+                    break;
+                }
             }
+            if (!bookAdded)
+            {
+                cout << "Library is full. Cannot add more books.\n";
+            }
+            cout << "Press Enter to continue...";
+            cin.get();
+            return;
         }
-        if (!bookAdded)
-
-        {
-            cout << "Library is full. Cannot add more books.\n";
-        }
-        cout << "Press Enter to continue...";
-        cin.get();
     }
 
     void editBook() override
     {
         cout << "\n- - - - - - - - - - Edit Book - - - - - - - - - -\n";
 
-        bool hasBooks = false;
-        for (int i = 0; i < size; i++)
+        if (!checkBooksAvailability(books, size))
         {
-            if (books[i] != nullptr)
-            {
-                hasBooks = true;
-                break;
-            }
-        }
-
-        if (!hasBooks)
-        {
-            cout << "No books available.\nPress Enter to continue...";
-            cin.get();
             return;
         }
 
-        string id;
-        int index = -1;
-
-        while (true)
+        string id = getValidId(books, size, true);
+        if (id.empty())
         {
-            cout << "Enter Book ID to edit: ";
-            getline(cin, id);
+            cout << "Edit operation cancelled.\n";
+            return;
+        }
 
-            if (!isValidId(id))
+        int index = -1;
+        for (int i = 0; i < size; i++)
+        {
+            if (books[i] != nullptr && books[i]->getId() == id)
             {
-                cout << "Invalid ID. Please enter a valid 3-digit number or uppercase letters.\n";
-                continue;
-            }
-
-            for (char &c : id)
-            {
-                c = toupper(c);
-            }
-
-            for (int i = 0; i < size; i++)
-            {
-                if (books[i] != nullptr && books[i]->getId() == id)
-                {
-                    index = i;
-                    break;
-                }
-            }
-
-            if (index != -1)
-            {
+                index = i;
                 break;
             }
+        }
 
+        if (index == -1)
+        {
             cout << "Book with ID " << id << " not found.\n";
-            cout << "Do you want to continue searching? [(Y) Yes | (N) No] ";
-
-            if (!choiceConfirmation())
-                return;
+            return;
         }
 
         Book *book = books[index];
 
-        while (true)
+        for (;;)
         {
             string isbn, title, author, edition, publication, category;
 
-            cout << "\nCurrent Details for book ID [" << book->getId() << "]:\n";
-            cout << "ISBN: " << book->getIsbn() << "\n";
-            cout << "Title: " << book->getTitle() << "\n";
-            cout << "Author: " << book->getAuthor() << "\n";
-            cout << "Edition: " << book->getEdition() << "\n";
-            cout << "Publication Year: " << book->getPublication() << "\n";
-            cout << "Category: " << book->getCategory() << "\n";
+            displayBookDetails(book);
 
             cout << "\nEnter new details (press Enter to keep current values):\n";
 
-            while (true)
-            {
-                cout << "Category (FICTION | NON-FICTION): ";
-                getline(cin, category);
-                if (category.empty() || isValidCategory(category))
-                {
-                    for (char &c : category)
-                        c = toupper(c);
-                    break;
-                }
-                cout << "Invalid Category. Try again.\n";
-            }
-            if (category.empty())
-                category = book->getCategory();
+            category = getValidCategoryInput(true);
 
-            while (true)
+            if (category.empty())
+            {
+                category = book->getCategory();
+            }
+
+            for (;;)
             {
                 cout << "ISBN: ";
                 getline(cin, isbn);
@@ -556,7 +581,7 @@ public:
             if (isbn.empty())
                 isbn = book->getIsbn();
 
-            while (true)
+            for (;;)
             {
                 cout << "Title: ";
                 getline(cin, title);
@@ -567,7 +592,7 @@ public:
             if (title.empty())
                 title = book->getTitle();
 
-            while (true)
+            for (;;)
             {
                 cout << "Author: ";
                 getline(cin, author);
@@ -578,7 +603,7 @@ public:
             if (author.empty())
                 author = book->getAuthor();
 
-            while (true)
+            for (;;)
             {
                 cout << "Edition: ";
                 getline(cin, edition);
@@ -589,7 +614,7 @@ public:
             if (edition.empty())
                 edition = book->getEdition();
 
-            while (true)
+            for (;;)
             {
                 cout << "Publication Year: ";
                 getline(cin, publication);
@@ -600,13 +625,13 @@ public:
             if (publication.empty())
                 publication = book->getPublication();
 
-            cout << "\nUpdated Details for book ID [" << book->getId() << "]:\n";
-            cout << "ISBN: " << isbn << "\n";
-            cout << "Title: " << title << "\n";
-            cout << "Author: " << author << "\n";
-            cout << "Edition: " << edition << "\n";
-            cout << "Publication Year: " << publication << "\n";
-            cout << "Category: " << category << "\n";
+            cout << "\nUpdated Details for book ID [" << book->getId() << "]:\n"
+                 << "ISBN: " << isbn << "\n"
+                 << "Title: " << title << "\n"
+                 << "Author: " << author << "\n"
+                 << "Edition: " << edition << "\n"
+                 << "Publication Year: " << publication << "\n"
+                 << "Category: " << category << "\n";
 
             cout << "Confirm changes? [(Y) Yes | (N) No] ";
             if (choiceConfirmation())
@@ -619,13 +644,13 @@ public:
                 book->setCategory(category);
 
                 cout << "Book details updated successfully.\n";
+                cout << "Press Enter to continue...";
+                cin.get();
                 break;
             }
             else
             {
                 cout << "Edit cancelled. Retry updating details.\n";
-                cout << "Press Enter to continue...";
-                cin.get();
             }
         }
     }
@@ -634,74 +659,38 @@ public:
     {
         cout << "\n- - - - - - - - - - Search Book - - - - - - - - - -\n";
 
-        bool hasBooks = false;
-        for (int i = 0; i < size; i++)
+        if (!checkBooksAvailability(books, size))
         {
-            if (books[i] != nullptr)
-            {
-                hasBooks = true;
-                break;
-            }
-        }
-
-        if (!hasBooks)
-        {
-            cout << "No books available.\n";
-            cout << "Press Enter to continue...";
-            cin.get();
             return;
         }
 
-        string id;
-        int index = -1;
+        string id = getValidId(books, size, true);
 
-        for (;;)
+        if (id.empty())
         {
-            cout << "Enter Book ID to search: ";
-            getline(cin, id);
-            if (isValidId(id) == false)
-            {
-                cout << "Invalid ID. Please enter a valid 3-digit number or uppercase letters.\n";
-                continue;
-            }
-            for (char &c : id)
-            {
-                c = toupper(c);
-            }
+            cout << "Search cancelled.\n";
+            return;
+        }
 
-            index = -1;
-            for (int i = 0; i < size; i++)
+        int index = -1;
+        for (int i = 0; i < size; i++)
+        {
+            if (books[i] != nullptr && books[i]->getId() == id)
             {
-                if (books[i] != nullptr && books[i]->getId() == id)
-                {
-                    index = i;
-                    break;
-                }
-            }
-
-            if (index != -1)
-            {
+                index = i;
                 break;
-            }
-
-            cout << "Book with ID " << id << " not found.\n";
-
-            cout << "Do you want to continue searching for a book? [(Y) Yes | (N) No] ";
-            if (choiceConfirmation() == false)
-            {
-                return;
             }
         }
 
-        Book *book = books[index];
-
-        cout << "\nDetails of the book ID [" << book->getId() << "]:\n";
-        cout << "ISBN: " << book->getIsbn() << "\n";
-        cout << "Title: " << book->getTitle() << "\n";
-        cout << "Author: " << book->getAuthor() << "\n";
-        cout << "Edition: " << book->getEdition() << "\n";
-        cout << "Publication Year: " << book->getPublication() << "\n";
-        cout << "Category: " << book->getCategory() << "\n";
+        if (index == -1)
+        {
+            cout << "Book with ID " << id << " not found.\n";
+        }
+        else
+        {
+            Book *book = books[index];
+            displayBookDetails(book);
+        }
 
         cout << "Press Enter to continue...";
         cin.clear();
@@ -710,32 +699,36 @@ public:
 
     void deleteBook() override
     {
-        cout << "\n- - - - - - - - - - Delete Book - - - - - - - - - - \n";
-        string id;
-
         for (;;)
         {
-            cout << "Enter Book ID to search: ";
-            getline(cin, id);
+            cout << "\n- - - - - - - - - - Delete Book - - - - - - - - - - \n";
 
-            if (!isValidId(id))
+            if (!checkBooksAvailability(books, size))
             {
-                cout << "Invalid ID. Please enter a valid 3-digit number or uppercase letters.\n";
-                continue;
+                return;
             }
 
-            for (char &c : id)
+            string id = getValidId(books, size, true);
+
+            if (id.empty())
             {
-                c = toupper(c);
+                cout << "Deletion cancelled.\n";
+                return;
             }
 
+            bool bookFound = false;
             for (int i = 0; i < size; i++)
             {
                 if (books[i] != nullptr && books[i]->getId() == id)
                 {
+                    bookFound = true;
                     cout << "Book with ID " << id << " found.\n";
+                    Book *book = books[i];
+
+                    displayBookDetails(book);
+
                     cout << "Are you sure you want to delete this book? [(Y) Yes | (N) No]: ";
-                    if (choiceConfirmation() == true)
+                    if (choiceConfirmation())
                     {
                         delete books[i];
                         books[i] = nullptr;
@@ -745,55 +738,38 @@ public:
                     {
                         cout << "Deletion cancelled.\n";
                     }
-                    return;
+
+                    cout << "Press Enter to continue...";
+                    cin.get();
+                    break;
                 }
             }
 
-            cout << "Book with ID " << id << " not found.\n";
+            if (!bookFound)
+            {
+                cout << "Book with ID " << id << " not found.\n";
+            }
+
+            cout << "Do you want to search for another book? [(Y) Yes | (N) No]: ";
+            if (!choiceConfirmation())
+            {
+                break;
+            }
         }
+        cout << "Press Enter to continue...";
+        cin.get();
     }
 
     void viewBookByCategory() override
     {
         cout << "\n- - - - - - - - - - View Books by Category - - - - - - - - - -\n";
 
-        bool hasBooks = false;
-        for (int i = 0; i < size; i++)
+        if (!checkBooksAvailability(books, size))
         {
-            if (books[i] != nullptr)
-            {
-                hasBooks = true;
-                break;
-            }
-        }
-
-        if (!hasBooks)
-        {
-            cout << "No books available.\n";
-            cout << "Press Enter to continue...";
-            cin.get();
             return;
         }
 
-        string category;
-        for (;;)
-        {
-            cout << "Enter category (FICTION | NON-FICTION): ";
-            getline(cin, category);
-
-            if (!isValidCategory(category))
-            {
-                cout << "Invalid category! Please enter FICTION or NON-FICTION.\n";
-                continue;
-            }
-
-            for (char &c : category)
-            {
-                if (isalpha(c))
-                    c = toupper(c);
-            }
-            break;
-        }
+        string category = getValidCategoryInput(false);
 
         cout << "\nShowing books in category: " << category << "\n";
         cout << left
@@ -918,6 +894,7 @@ void displayMenu(Library &libraryInstance)
     case 4:
         libraryInstance.deleteBook();
         displayMenu(libraryInstance);
+        return;
     case 5:
         libraryInstance.viewBookByCategory();
         displayMenu(libraryInstance);
@@ -941,6 +918,7 @@ int main()
 {
     Library *libraryInstance = new Library();
     displayMenu(*libraryInstance);
+    delete libraryInstance;
 
     return 0;
 }
